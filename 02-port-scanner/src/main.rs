@@ -1,0 +1,45 @@
+use std::env;
+use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::time::{Duration, Instant};
+
+fn port_scanner(ip_addr: String, min_port: u16, max_port: u16) {
+    let Ok(ip) = ip_addr.parse::<IpAddr>() else {
+        println!("invalid address");
+        return;
+    };
+
+    let duration = Duration::new(1, 0);
+
+    for port in min_port..=max_port {
+        let socket_addr = SocketAddr::new(ip, port);
+        let result_connexion = TcpStream::connect_timeout(&socket_addr, duration);
+
+        match result_connexion {
+            Ok(_c) => println!("Connexion successful: port {} is open", port),
+            Err(_) => {}
+        }
+    }
+}
+
+fn main() {
+    let mut ip_addr = String::new();
+    let mut min_port: u16 = 1;
+    let mut max_port: u16 = 1024;
+
+    let args: Vec<String> = env::args().collect::<Vec<String>>();
+
+    if args.len() != 4 || args[1] == "--help" {
+        println!("Help: `cargo run -- --help`");
+        println!("Usage: `cargo run -- ip_addr min_port max_port`");
+        return;
+    } else {
+        ip_addr = args[1].clone();
+        min_port = args[2].parse::<u16>().expect("Failed");
+        max_port = args[3].parse::<u16>().expect("Failed");
+    }
+
+    let start = Instant::now();
+    port_scanner(ip_addr, min_port, max_port);
+    let elapsed = start.elapsed();
+    println!("{} ports scanned in {:?}", max_port, elapsed);
+}
