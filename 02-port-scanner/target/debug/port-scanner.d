@@ -1,0 +1,1 @@
+/home/lainrice/Desktop/MIRA/rust_systems_security/rust-systems-security/02-port-scanner/target/debug/port-scanner: /home/lainrice/Desktop/MIRA/rust_systems_security/rust-systems-security/02-port-scanner/src/main.rs

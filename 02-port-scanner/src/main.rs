@@ -1,5 +1,6 @@
 use std::env;
 use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::thread;
 use std::time::{Duration, Instant};
 
 fn port_scanner(ip_addr: String, min_port: u16, max_port: u16) {
@@ -9,15 +10,21 @@ fn port_scanner(ip_addr: String, min_port: u16, max_port: u16) {
     };
 
     let duration = Duration::new(1, 0);
+    let mut handles = Vec::new();
 
     for port in min_port..=max_port {
         let socket_addr = SocketAddr::new(ip, port);
-        let result_connexion = TcpStream::connect_timeout(&socket_addr, duration);
-
-        match result_connexion {
+        handles.push(thread::spawn(move|| {
+            let result_connexion = TcpStream::connect_timeout(&socket_addr, duration);
+            match result_connexion {
             Ok(_c) => println!("Connexion successful: port {} is open", port),
             Err(_) => {}
         }
+        }))
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
     }
 }
 
