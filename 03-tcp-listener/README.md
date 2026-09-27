@@ -40,3 +40,24 @@ cargo run
 
 - Vrai chat : relayer les messages entre clients connectés (nécessite un état partagé entre threads — `Arc`/`Mutex`)
 - Gestion propre de la déconnexion d'un client
+
+**Partage d'état entre threads avec `Arc<Mutex<T>>`**
+Pour un vrai chat (diffuser un message à tous les clients connectés), chaque thread a besoin d'accéder à une **même** liste partagée de connexions — contrairement au buffer de lecture (`[u8; 1024]`, `Copy`), qui pouvait être dupliqué sans risque, un `Vec<TcpStream>` doit être **réellement partagé**, pas copié.
+
+- `Arc<T>` ("Atomically Reference Counted") permet à plusieurs threads de partager la possession d'une même donnée — chaque `Arc::clone(&shared)` incrémente un compteur de références et pointe vers la même donnée sous-jacente, sans la dupliquer.
+- `Mutex<T>` protège l'accès concurrent : un seul thread à la fois peut modifier la donnée, via `.lock()`, qui bloque jusqu'à obtenir l'accès exclusif et relâche automatiquement le verrou à la fin de son scope.
+
+**`TcpStream::try_clone()` : séparer lecture et écriture**
+Un même client doit à la fois pouvoir être lu (dans son propre thread) et recevoir des messages écrits par d'autres threads (diffusion). `try_clone()` donne un second descripteur pointant vers la même connexion réseau sous-jacente — le stream d'origine reste dédié à la lecture, le clone rejoint la liste partagée pour l'écriture depuis les autres threads.
+
+**Ordre des opérations : rejoindre le groupe avant d'écouter**
+Premier essai bugué : le client n'était ajouté à la liste partagée qu'après avoir lui-même envoyé un message — donc invisible pour les autres clients tant qu'il n'avait pas parlé. Correction : cloner le stream et le pousser dans la liste partagée **immédiatement** à la connexion, avant toute lecture.
+
+**Robustesse de la diffusion**
+Écrire vers un client déconnecté produit une erreur (`write_all` échoue, ex: "broken pipe"). Un `.unwrap()` sur cette écriture ferait paniquer le thread au premier client mort dans la liste, interrompant la diffusion aux clients suivants. Remplacé par `if let Err(e) = ...` pour logger sans interrompre la boucle.
+
+## Pistes d'amélioration (à venir)
+
+- Exclure l'expéditeur de la diffusion (actuellement il reçoit son propre message en echo)
+- Retirer proprement un client de la liste partagée à sa déconnexion (actuellement les streams morts s'accumulent)
+- Identifiants/pseudos par client
